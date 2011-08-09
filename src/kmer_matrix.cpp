@@ -36,7 +36,6 @@ kmer_matrix::kmer_matrix(const YAML::Node& node)
     A = new double[size1 * size2];
 
     const YAML::Node& node_A = node["A"];
-    fprintf(stderr, "%zu\n", node_A.size());
 
     size_t i;
     for (i = 0; i < size1 * size2; ++i) {
