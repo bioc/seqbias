@@ -5,6 +5,11 @@
 #include <cstdarg>
 #include <cstdlib>
 
+/* when building against R, we need to de-pollute the namespace a bit: */
+#ifdef ERROR
+#undef ERROR
+#endif
+
 /** This is meant to be striped-down, more R-friendly mimic of the logger class
  * in isolator.
  */

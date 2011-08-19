@@ -7,6 +7,11 @@ extern "C" {
 #include "samtools/faidx.h"
 #include "samtools/sam.h"
 
+
+#ifdef ERROR
+#undef ERROR
+#endif
+
 #include <R.h>
 #include <Rinternals.h>
 #include <Rdefines.h>
