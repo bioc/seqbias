@@ -109,10 +109,14 @@ setClass( "seqbias",
 
 
 
-"count.reads" <- function( reads_fn, I, binary = TRUE )
+"count.reads" <- function( reads_fn, I, sb = NULL, binary = FALSE, sum.counts = FALSE )
 {
     require(GenomicRanges)
     stopifnot( is( I, "GRanges" ) )
+
+    if (!is.null(sb) & class(sb) != "seqbias") {
+        stop( "The 'sb' parameter of count.reads must be a seqbias class." )
+    }
 
     bam_ptr <- .Call( "seqbias_open_bam", path.expand(reads_fn),
                       PACKAGE = "seqbias" )
@@ -120,10 +124,12 @@ setClass( "seqbias",
     counts <- tapply( I,
                       INDEX = 1:length(I),
                       FUN   = function(x) .Call( "seqbias_count_reads",
+                                                 sb,
                                                  bam_ptr,
                                                  as.character(seqnames(x)),
                                                  start(x), end(x),
                                                  as.character(strand(x)),
+                                                 sum.counts,
                       PACKAGE = "seqbias" ) )
 
     if( binary ) lapply( counts, FUN = function(c) as.integer( c > 0 ) )

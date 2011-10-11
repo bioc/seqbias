@@ -21,7 +21,13 @@
 class sequencing_bias
 {
     public:
-        /** Load a model that has bee previously trained. */
+        /** Load a model that has been previously trained, without a reference
+         * sequence. (It can not be actually used this way.)
+         */
+        sequencing_bias(const char* model_fn);
+
+
+        /** Load a model that has been previously trained. */
         sequencing_bias(const char* ref_fn,
                         const char* model_fn);
 
@@ -74,7 +80,7 @@ class sequencing_bias
         void to_yaml(YAML::Emitter&) const;
 
         /** Return a string of the model graph in dot format. */
-        std::string print_model_graph();
+        std::string model_graph() const;
 
 
     private:
@@ -105,6 +111,15 @@ class sequencing_bias
         /* trained background (M0) and foreground (M1) models */
         motif* M;
 };
+
+
+/** Tabulate the bias in a given dataset, optionally correcting for bias using
+ *  the given model. */
+kmer_matrix tabulate_bias(double* kl,
+                          pos_t L, pos_t R, int k,
+                          const char* ref_fn,
+                          const char* reads_fn,
+                          const char* model_fn = NULL);
 
 
 #endif

@@ -45,6 +45,10 @@ class motif
         /** emit yaml serialization */
         void to_yaml(YAML::Emitter& out) const;
 
+        /** print the model graph in GraphViz (dot) format,
+         *  adjusting position labels by the given offset. */
+        std::string model_graph(int offset) const;
+
     private:
         motif();
 

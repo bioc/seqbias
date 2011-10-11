@@ -126,7 +126,7 @@ seqs[neg_idx] <- reverseComplement( seqs[neg_idx] )
 Finally, we count the number of reads mapping to each position in our sampled
 intervals.
 <<>>=
-counts <- count.reads( reads_fn, I )
+counts <- count.reads( reads_fn, I, binary = T )
 @
 
 Unless the \texttt{binary} argument is FALSE, this function returns a 0-1 vector,
@@ -192,7 +192,7 @@ more reads are available a more accurate model can be trained at the expense of
 the training procedure taking up to several minutes.
 
 <<results=hide>>=
-sb <- seqbias.fit( ref_fn, reads_fn, L = 5, R = 20 )
+sb <- seqbias.fit( ref_fn, reads_fn, L = 5, R = 15 )
 @
 
 The \texttt{L} and \texttt{R} arguments control the maximum number of positions

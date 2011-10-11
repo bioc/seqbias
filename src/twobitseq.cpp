@@ -8,10 +8,8 @@
 #include "twobitseq.hpp"
 #include <algorithm>
 #include <cstring>
+#include <cstdlib>
 
-/* Don't expose this function. No one should have to know how we are mapping
- * letters to numbers.
- */
 kmer nuc_to_num(char c)
 {
     switch( c ) {
@@ -26,36 +24,48 @@ kmer nuc_to_num(char c)
     }
 }
 
-void num_to_nuc(char* dest, int n, int k)
+
+
+void num_to_nuc(char* dest, kmer K, int k)
 {
     int i;
     /* read backwards, then reverse */
-    for( i = 0; i < k; i++ ) {
-        switch( n & 0x3 ) {
+    for (i = 0; i < k; ++i) {
+        switch (K & 0x3) {
             case 0: dest[i] = 'a'; break;
             case 1: dest[i] = 'c'; break;
             case 2: dest[i] = 'g'; break;
             case 3: dest[i] = 't'; break;
         }
-        n >>= 2;
-    }
-    dest[i] = '\0';
 
+        K >>= 2;
+    }
+
+    dest[i] = '\0';
     std::reverse(dest, dest + i);
 }
 
 
 const size_t twobitseq::max_kmer = 4 * sizeof(kmer);
 
+twobitseq::twobitseq()
+    : xs(NULL)
+    , n(0)
+{
+
+}
+
 
 twobitseq::twobitseq(const char* seq)
     : xs(NULL)
     , n(0)
 {
+    if (seq == NULL) return;
     n = strlen(seq);
     if (n == 0) return;
 
-    xs = new kmer[n / max_kmer + 1];
+    xs = reinterpret_cast<kmer*>(
+            malloc_or_die((n / max_kmer + 1) * sizeof(kmer)));
     memset(xs, 0, (n / max_kmer + 1) * sizeof(kmer));
 
     size_t i;
@@ -77,7 +87,8 @@ twobitseq::twobitseq(const twobitseq& other)
     n = other.n;
     if (n == 0) return;
 
-    xs = new kmer[n / max_kmer + 1];
+    xs = reinterpret_cast<kmer*>(
+            malloc_or_die((n / max_kmer + 1) * sizeof(kmer)));
     memcpy(xs, other.xs, (n / max_kmer + 1) * sizeof(kmer));
 }
 
@@ -85,17 +96,57 @@ twobitseq::twobitseq(const twobitseq& other)
 
 twobitseq::~twobitseq()
 {
-    delete [] xs;
+    free(xs);
 }
 
 
 void twobitseq::operator = (const twobitseq& other)
 {
     n = other.n;
-
-    delete [] xs;
-    xs = new kmer[n / max_kmer + 1];
+    xs = reinterpret_cast<kmer*>(
+            realloc_or_die(xs, (n / max_kmer + 1) * sizeof(kmer)));
     memcpy(xs, other.xs, (n / max_kmer + 1) * sizeof(kmer));
+}
+
+
+void twobitseq::operator = (const char* seq)
+{
+    if (seq == NULL) {
+        n = 0;
+        free(xs);
+        xs = NULL;
+        return;
+    }
+
+    n = strlen(seq);
+    xs = reinterpret_cast<kmer*>(
+            realloc_or_die(xs, (n / max_kmer + 1) * sizeof(kmer)));
+    memset(xs, 0, (n / max_kmer + 1) * sizeof(kmer));
+
+    size_t i;
+    size_t block, offset;
+    for (i = 0; i < n; ++i) {
+        block  = i / max_kmer;
+        offset = i % max_kmer;
+
+        xs[block] = xs[block] | (nuc_to_num(seq[i]) << (2*offset));
+    }
+}
+
+
+kmer twobitseq::get_kmer(int k, pos_t pos)
+{
+    size_t block, offset;
+    size_t i;
+    kmer K = 0;
+
+    for (i = 0; i < (size_t) k; ++i) {
+        block  = (i + (size_t) (pos - (k - 1))) / max_kmer;
+        offset = (i + (size_t) (pos - (k - 1))) % max_kmer;
+        K = (K << 2) | ((xs[block] >> (2 * offset)) & 0x3);
+    }
+
+    return K;
 }
 
 

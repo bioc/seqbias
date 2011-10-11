@@ -11,6 +11,7 @@
 #include "miscmath.h"
 #include "samtools_extra.h"
 #include "samtools/faidx.h"
+#include <climits>
 #include <cmath>
 #include <cctype>
 #include <ctime>
@@ -55,17 +56,6 @@ static double rand_gauss(double sigma)
 }
 
 
-static double rand_trunc_gauss(double sigma, double a, double b)
-{
-    double x;
-    do {
-        x = rand_gauss(sigma);
-    } while (x < a || x > b);
-
-    return x;
-}
-
-
 double gauss_pdf (const double x, const double sigma)
 {
   double u = x / fabs (sigma);
@@ -86,24 +76,29 @@ static int read_pos_count_compare(const void* p1, const void* p2)
 }
 
 
-/*
-static int read_pos_tid_count_compare(const void* p1, const void* p2)
-{
-    int c = (int)(((read_pos*)p1)->tid - ((read_pos*)p2)->tid);
-
-    if (c == 0) {
-        return (int)((read_pos*)p2)->count - (int)((read_pos*)p1)->count;
-    }
-    else return c;
-}
-*/
-
-
 
 sequencing_bias::sequencing_bias()
     : ref_f(NULL)
     , M(NULL)
 {}
+
+
+sequencing_bias::sequencing_bias(const char* model_fn)
+    : ref_f(NULL)
+    , M(NULL)
+{
+    std::ifstream fin;
+    fin.open(model_fn);
+
+    YAML::Parser parser(fin);
+    YAML::Node doc;
+    parser.GetNextDocument(doc);
+
+    doc["L"] >> L;
+    doc["R"] >> R;
+
+    M = new motif(doc["motif"]);
+}
 
 sequencing_bias::sequencing_bias(const char* ref_fn,
                                  const char* model_fn)
@@ -122,12 +117,15 @@ sequencing_bias::sequencing_bias(const char* ref_fn,
 
     M = new motif(doc["motif"]);
 
-    this->ref_fn = ref_fn;
 
-    ref_f = fai_load(ref_fn);
-    if (ref_f == NULL) {
-        logger::abort("Can't open indexed FASTA file %s\n", ref_fn);
+    if (ref_fn != NULL) {
+        this->ref_fn = ref_fn;
+        ref_f = fai_load(ref_fn);
+        if (ref_f == NULL) {
+            logger::abort("Can't open indexed FASTA file %s\n", ref_fn);
+        }
     }
+    else ref_f = NULL;
 }
 
 
@@ -233,7 +231,6 @@ void sequencing_bias::build(const char* ref_fn,
 
     while (samread(reads_f, read) > 0) {
         if (read->core.n_cigar != 1) continue;
-        if (read->core.flag & BAM_FREAD2) continue;
         k++;
         if (k % 1000000 == 0) {
             logger::info("hashed %zu reads.", k);
@@ -265,7 +262,7 @@ void sequencing_bias::build(const char* ref_fn,
     this->L = L;
     this->R = R;
 
-    unsigned int i;
+    unsigned int i = 0;
 
     read_pos* S_tmp;
     read_pos* S;
@@ -273,33 +270,11 @@ void sequencing_bias::build(const char* ref_fn,
     const size_t max_dump = 10000000;
     pos_table_dump(T, &S_tmp, &N, max_dump);
 
-    /* sort by count */
-    qsort(S_tmp, N, sizeof(read_pos), read_pos_count_compare);
-
-    /* consider only reads with at least one duplicate */
-    for (i = 0; i < N; ++i) {
-        if (S_tmp[i].count <= 1) break;
-    }
-
-    /* (unless there are very few of these reads */
-    if (i > 10000) {
-        max_reads = std::min<size_t>(max_reads, i);
-        logger::info("%zu reads with duplicates.", i);
-    }
-    else {
-        i = N;
-    }
-
-
-    /* ignore the top 1%, as they tend to be vastly higher than anything else,
-     * and thus can throw things off when training with small numbers of reads
-     * */
-    S = S_tmp + i/100;
-    max_reads = min<size_t>(max_reads, 99*i/100); 
+    S = S_tmp;
 
     /* sort by tid (so we can load one chromosome at a time) */
+    random_shuffle(S, S + N);
     qsort(S, std::min<size_t>(max_reads, N), sizeof(read_pos), read_pos_tid_compare);
-
 
     /* sample foreground and background kmer frequencies */
     ref_f = fai_load(ref_fn);
@@ -337,7 +312,7 @@ void sequencing_bias::build(const char* ref_fn,
             seqname = T->seq_names[ S[i].tid ];
             if (seq) free(seq); 
 
-            seq = faidx_fetch_seq(ref_f, seqname, 0, 1000000000, &seqlen);
+            seq = faidx_fetch_seq(ref_f, seqname, 0, INT_MAX, &seqlen);
 
             logger::info("read sequence %s.", seqname);
 
@@ -374,7 +349,7 @@ void sequencing_bias::build(const char* ref_fn,
         /* adjust the current read position randomly, and sample */
         for (bg_sample_num = 0; bg_sample_num < bg_samples;) {
 
-            bg_pos = S[i].pos + (pos_t)round_away(rand_trunc_gauss(12, -200, 200));
+            bg_pos = S[i].pos + (pos_t)round_away(rand_gauss(500));
 
             if (S[i].strand == strand_neg) {
                 if (bg_pos < R || bg_pos >= seqlen - L) continue;
@@ -464,17 +439,201 @@ double* sequencing_bias::get_bias(const char* seqname,
         bs[i] = M->eval(seq, i);
     }
 
-
     free(seqstr);
     return bs;
 }
 
 
-string sequencing_bias::print_model_graph()
+string sequencing_bias::model_graph() const
 {
-    // TODO
-    //return M->print_model_graph(L);
-    return string();
+    return M->model_graph((int) L);
+}
+
+
+kmer_matrix tabulate_bias(double* kl,
+                          pos_t L, pos_t R, int k,
+                          const char* ref_fn,
+                          const char* reads_fn,
+                          const char* model_fn)
+{
+    /* This function procedes very much like the sequencing_bias::build
+     * function, but does not finally train a motif, but rather tabulates
+     * k-mer frequencies. */
+    size_t max_reads = 250000;
+
+    kmer_matrix dest((size_t) (L + 1 + R), (size_t) k);
+    dest.set_all(0.0);
+
+    faidx_t* ref_f = fai_load(ref_fn);
+    if (ref_f == NULL) {
+        logger::abort("Can't open fasta file '%s'.", ref_fn);
+    }
+
+    samfile_t* reads_f = samopen(reads_fn, "rb", NULL);
+    if (reads_f == NULL) {
+        logger::abort("Can't open bam file '%s'.", reads_fn);
+    }
+
+    bam_index_t* reads_index = bam_index_load(reads_fn);
+    if (reads_index == NULL) {
+        logger::abort("Can't open bam index '%s.bai'.", reads_fn);
+    }
+
+    sequencing_bias* sb = NULL;
+    if (model_fn != NULL) {
+        sb = new sequencing_bias(ref_fn, model_fn);
+    }
+
+
+    bam_init_header_hash(reads_f->header);
+    bam1_t* read = bam_init1();
+
+    pos_table T;
+    pos_table_create(&T, reads_f->header->n_targets);
+    T.seq_names = reads_f->header->target_name;
+
+    size_t hashed_count = 0;
+    while (samread(reads_f, read) > 0) {
+        if (read->core.n_cigar != 1) continue;
+        if (++hashed_count % 1000000 == 0) {
+            logger::info("hashed %zu reads.", hashed_count);
+        }
+        pos_table_inc(&T, read);
+    }
+    logger::info("hashed %zu reads.", hashed_count);
+
+    read_pos* S_tmp;
+    read_pos* S;
+    size_t N;
+    const size_t max_dump = 10000000;
+    pos_table_dump(&T, &S_tmp, &N, max_dump);
+
+    /* sort by count */
+    qsort(S_tmp, N, sizeof(read_pos), read_pos_count_compare);
+
+    /* consider only reads with at least one duplicate */
+    size_t i;
+    for (i = 0; i < N; ++i) {
+        if (S_tmp[i].count <= 1) break;
+    }
+
+    /* (unless there are very few of these reads */
+    if (i > 10000) {
+        max_reads = std::min<size_t>(max_reads, i);
+        logger::info("%zu reads with duplicates.", i);
+    }
+    else {
+        i = N;
+    }
+
+    /* ignore the top 1%, as they tend to be vastly higher than anything else,
+     * and thus can throw things off when training with small numbers of reads
+     * */
+    S = S_tmp + i/100;
+    max_reads = min<size_t>(max_reads, 99*i/100); 
+
+    /* sort by tid (so we can load one chromosome at a time) */
+    qsort(S, std::min<size_t>(max_reads, N), sizeof(read_pos), read_pos_tid_compare);
+
+    twobitseq tbs;
+
+    char* local_seq;
+    local_seq = new char[ (k - 1) + L + 1 + R + 1 ];
+    local_seq[(k - 1) + L + 1 + R] = '\0';
+
+    double         w;
+    char*          seq       = NULL;
+    int            seqlen    = 0;
+    int            curr_tid  = -1;
+    char*          seqname   = NULL;
+
+    for (i = 0; i < N && i < max_reads; i++) {
+        if (S[i].tid != curr_tid) {
+            seqname = T.seq_names[S[i].tid];
+            free(seq);
+            seq = faidx_fetch_seq(ref_f, seqname, 0, INT_MAX, &seqlen);
+            logger::info("read sequence %s.", seqname);
+            curr_tid = S[i].tid;
+
+            if (seq == NULL) {
+                logger::warn("warning: reference sequence not found, skipping.");
+            }
+        }
+
+        if (seq == NULL) continue;
+
+        if (S[i].strand == strand_neg) {
+            if (S[i].pos < R || S[i].pos >= seqlen - L - (k-1)) continue;
+            memcpy(local_seq, seq + S[i].pos - R, ((k-1)+L+1+R)*sizeof(char));
+            seqrc(local_seq, L+1+R);
+        }
+        else {
+            if (S[i].pos < L + (k-1) || S[i].pos >= seqlen - R) continue;
+            memcpy(local_seq, seq + (S[i].pos - L - (k-1)), ((k-1)+L+1+R)*sizeof(char));
+        }
+
+        if (sb) {
+            // TODO: get_bias
+        }
+        else w = 1.0;
+
+        tbs = local_seq;
+        kmer K;
+        for (pos_t pos = (k-1); pos < (k-1) + L + 1 + R; ++pos) {
+            K = tbs.get_kmer(k, pos);
+            dest(pos - (k-1), K) += w;
+        }
+    }
+
+    /* compute KL divergence */
+
+    /* estimate a background distribution by averaging across the entire window
+     * */
+    int four_to_k = 1 << (2 * k);
+    double* bg = new double[four_to_k];
+    memset(bg, 0, four_to_k * sizeof(double));
+    for (pos_t pos = 0; pos < L + 1 + R; ++pos) {
+        for (kmer K = 0; K < (kmer) four_to_k; ++K) {
+            bg[K] += dest(pos, K);
+        }
+    }
+
+    kmer_matrix norm_dest(dest);
+    norm_dest.make_distribution();
+
+    double z = 0.0;
+    for (kmer K = 0; K < (kmer) four_to_k; ++K) z += bg[K];
+    for (kmer K = 0; K < (kmer) four_to_k; ++K) bg[K] /= z;
+
+
+    /* Compute the (symetric) kullback-leibler divegnnce */
+    memset(kl, 0, (L + 1 + R) * sizeof(double));
+    for (pos_t pos = 0; pos < L + 1 + R; ++pos) {
+        kl[pos] = 0.0;
+        for (kmer K = 0; K < (kmer) four_to_k; ++K) {
+            if (norm_dest(pos, K) > 0.0) {
+                kl[pos] += norm_dest(pos, K) * (log2(norm_dest(pos, K)) - log2(bg[K]));
+            }
+
+            if (bg[K] > 0.0) {
+                kl[pos] += bg[K] * (log2(bg[K]) - log2(norm_dest(pos, K)));
+            }
+        }
+    }
+
+    delete [] bg;
+
+
+    free(seq);
+    free(local_seq);
+    free(S_tmp);
+    bam_destroy1(read);
+    pos_table_destroy(&T);
+    delete sb;
+    bam_index_destroy(reads_index);
+    samclose(reads_f);
+
+    return dest;
 }
 
 

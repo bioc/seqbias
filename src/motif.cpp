@@ -186,7 +186,8 @@ class motif_trainer
             compute_reachability();
 
             logger::print(col_base);
-            snprintf(msg, sizeof(msg), "round %4zu (ic = %0.4e)", round_num, ic);
+            snprintf(msg, sizeof(msg), "round %4lu (ic = %0.4e)",
+                                       (unsigned long)round_num, ic);
             logger::print(msg);
             logger::print(col_base);
             col = 0;
@@ -442,7 +443,6 @@ class motif_trainer
             else i_start = i_end = j;
 
             for (i = i_start; i <= i_end; ++i) {
-
                 /* skip existing edges */
                 if (M.has_edge(i, j)) continue;
 
@@ -800,7 +800,7 @@ motif::motif(const YAML::Node& node)
     /* m */
     unsigned int m_;
     node["m"] >> m_;
-    m = (size_t) m;
+    m = (size_t) m_;
 
 
     /* parents */
@@ -809,8 +809,10 @@ motif::motif(const YAML::Node& node)
     const YAML::Node& parents_node = node["parents"];
 
     size_t i;
-    for (i = 0; i < m; ++i) {
-        parents_node[i] >> parents[i];
+    int b;
+    for (i = 0; i < m * m; ++i) {
+        parents_node[i] >> b;
+        parents[i] = (bool) b;
     }
 
 
@@ -840,7 +842,7 @@ void motif::to_yaml(YAML::Emitter& out) const
     out << YAML::Flow << YAML::BeginSeq;
 
     size_t i;
-    for (i = 0; i < m * m; ++i) out << parents[i];
+    for (i = 0; i < m * m; ++i) out << (parents[i] ? 1 : 0);
 
     out << YAML::EndSeq;
 
@@ -857,6 +859,45 @@ void motif::to_yaml(YAML::Emitter& out) const
     P1->to_yaml(out);
 
     out << YAML::EndMap;
+}
+
+
+string motif::model_graph(int offset) const
+{
+    string graph_str;
+    char strbuf[512];
+
+    graph_str += "digraph {\n";
+    graph_str += "splines=\"true\";\n";
+    graph_str += "node [shape=\"box\"];\n";
+
+    /* print nodes */
+    size_t i, j;
+    for (j = 0; j < m; j++) {
+        snprintf(strbuf, sizeof(strbuf), 
+                 "n%d [label=\"%d\",pos=\"%d,0\",style=\"%s\"];\n",
+                 (int) j, (int) j - offset, (int) j * 100,
+                 parents[j * m + j] ? "solid" : "dotted");
+
+        graph_str += strbuf;
+    }
+
+    /* print edges */
+    for (j = 0; j < m; ++j) {
+        if (!parents[j * m + j]) continue;
+
+        for (i = 0; i < m; ++i) {
+            if (i == j) continue;
+            if (parents[j * m + i]) {
+                snprintf(strbuf, sizeof(strbuf),
+                         "n%lu -> n%lu;\n", (unsigned long) i, (unsigned long) j);
+                graph_str += strbuf;
+            }
+        }
+    }
+
+    graph_str += "}\n";
+    return graph_str;
 }
 
 

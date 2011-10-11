@@ -21,8 +21,8 @@
 class twobitseq
 {
     public:
-        /** create an empty sequence (uninitialized, filled with noise) */
-        twobitseq(size_t n);
+        /** create an empty sequence. */
+        twobitseq();
 
         /** create a sequence from a DNA/RNA sequence string */
         twobitseq(const char* seq);
@@ -33,6 +33,11 @@ class twobitseq
         ~twobitseq();
 
         void operator = (const twobitseq&);
+        void operator = (const char* seq);
+
+        /* get the kmer ending at position i */
+        kmer get_kmer(int k, pos_t i);
+
 
         /** extract a kmer.
          *
@@ -51,12 +56,13 @@ class twobitseq
         static const size_t max_kmer;
 };
 
+
 /** Convert a nucleotide charactor to a number, using the same scheme as
  * twobitseq */
 kmer nuc_to_num(char c);
 
 /** Convert a number n encoding a kmer into a string of nucleotides */
-void num_to_nuc(char* dest, int n, int k);
+void num_to_nuc(char* dest, kmer K, int k);
 
 #endif
 

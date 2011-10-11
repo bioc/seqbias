@@ -153,8 +153,13 @@ SEXP seqbias_predict( SEXP seqbias,
     pos_t c_start, c_end;
     strand_t c_strand;
 
+
     coerce_genomic_coords( seqname, start, end, strand,
                            &c_seqname, &c_start, &c_end, &c_strand );
+
+    /* we expect 1-based coordinates, but work with 0-based */
+    c_start -= 1;
+    c_end   -= 1;
                            
     if( c_strand != 0 && c_strand != 1 ) {
         warning( "strand should be '+' or '-'" );
@@ -217,11 +222,13 @@ SEXP seqbias_open_bam( SEXP reads_fn )
 }
 
 
-SEXP seqbias_count_reads( SEXP bam_ptr,
+SEXP seqbias_count_reads( SEXP seqbias,
+                          SEXP bam_ptr,
                           SEXP seqname,
                           SEXP start,
                           SEXP end,
-                          SEXP strand )
+                          SEXP strand,
+                          SEXP sum_counts )
 {
     if( TYPEOF(bam_ptr) != EXTPTRSXP ) error( "argument is not a indexed bam pointer" );
     indexed_bam_f* c_bam_ptr = (indexed_bam_f*)EXTPTR_PTR( bam_ptr );
@@ -232,13 +239,52 @@ SEXP seqbias_count_reads( SEXP bam_ptr,
 
     coerce_genomic_coords( seqname, start, end, strand,
                            &c_seqname, &c_start, &c_end, &c_strand );
+
+
+    /* we expect 1-based coordinates, but use 0-based */
+    c_start -= 1;
+    c_end   -= 1;
                            
+
+    double* bs[2] = {NULL, NULL};
+
+    if( !isNull(seqbias) ) {
+
+        SEXP idx;
+        PROTECT( idx = allocVector( STRSXP, 1 ) );
+        SET_STRING_ELT(idx, 0, mkChar("ptr"));
+
+        sequencing_bias* c_seqbias = NULL;
+        if( TYPEOF(GET_SLOT(seqbias, idx)) != EXTPTRSXP ||
+            !(c_seqbias = (sequencing_bias*)EXTPTR_PTR(GET_SLOT(seqbias, idx))) ) {
+            error( "first argument is not a proper seqbias class." );
+        }
+        
+        if (c_strand == strand_na || c_strand == strand_pos ) {
+            bs[0] = c_seqbias->get_bias(c_seqname, c_start, c_end, strand_pos);
+        }
+
+        if (c_strand == strand_na || c_strand == strand_neg ) {
+            bs[1] = c_seqbias->get_bias(c_seqname, c_start, c_end, strand_neg);
+            std::reverse(bs[1], bs[1] + (c_end - c_start + 1));
+        }
+
+        UNPROTECT(1);
+    }
+
+    bool c_sum_counts = asLogical(sum_counts) == TRUE;
 
     /* init vector */
     SEXP v;
-    PROTECT( v = allocVector( REALSXP, c_end - c_start + 1 ) );
-    pos_t i;
-    for( i = 0; i < c_end - c_start + 1; i++ ) REAL(v)[i] = 0;
+    if (c_sum_counts) {
+        PROTECT( v = allocVector( REALSXP, 1 ) );
+        REAL(v)[0] = 0;
+    }
+    else {
+        PROTECT( v = allocVector( REALSXP, c_end - c_start + 1 ) );
+        pos_t i;
+        for( i = 0; i < c_end - c_start + 1; i++ ) REAL(v)[i] = 0;
+    }
 
 
     const size_t region_len = 1024;
@@ -261,23 +307,38 @@ SEXP seqbias_count_reads( SEXP bam_ptr,
     bam_iter_t it = bam_iter_query( c_bam_ptr->idx, bam_ref_id, bam_start, bam_end );
     bam1_t* b = bam_init1();
     pos_t x;
+    strand_t s;
+
 
     while( bam_iter_read( c_bam_ptr->f->x.bam, it, b ) > 0 ) {
-        if( bam1_strand(b) !=  c_strand ) continue;
+        s = (strand_t) bam1_strand(b);
+        if( c_strand != strand_na && s !=  c_strand ) continue;
+
         x = bam1_strand(b) == 1 ? bam_calend( &b->core,  bam1_cigar(b) ) - 1 : b->core.pos;
-        if( c_start <= x && x <= c_end ) REAL(v)[x - c_start]++;
+        if (x < c_start || x > c_end) continue;
+
+        if (c_sum_counts) {
+            REAL(v)[0] += bs[s] == NULL ? 1.0 : (1.0 / bs[s][x - c_start]);
+        }
+        else {
+            REAL(v)[x - c_start] += bs[s] == NULL ? 1.0 : (1.0 / bs[s][x - c_start]);
+        }
     }
 
-    if( c_strand == strand_neg ) {
+    if( c_strand == strand_neg && !c_sum_counts ) {
         std::reverse(REAL(v), REAL(v) + (c_end - c_start + 1));
     }
 
     bam_iter_destroy( it );
     bam_destroy1(b);
 
+    delete [] bs[0];
+    delete [] bs[1];
+
     UNPROTECT(1);
     return v;
 }
+
 
 
 
@@ -433,7 +494,7 @@ void R_init_seqbias( DllInfo* info )
         { "seqbias_load",        (DL_FUNC) &seqbias_load, 2 },
         { "seqbias_save",        (DL_FUNC) &seqbias_save, 2 },
         { "seqbias_open_bam",       (DL_FUNC) &seqbias_open_bam, 1 },
-        { "seqbias_count_reads",    (DL_FUNC) &seqbias_count_reads, 5 },
+        { "seqbias_count_reads",    (DL_FUNC) &seqbias_count_reads, 7 },
         { "seqbias_alloc_kmer_matrix",          (DL_FUNC) &seqbias_alloc_kmer_matrix, 2 },
         { "seqbias_tally_kmers",                (DL_FUNC) &seqbias_tally_kmers, 4 },
         { "sebqias_dataframe_from_kmer_matrix", (DL_FUNC) &seqbias_dataframe_from_kmer_matrix, 2 },
