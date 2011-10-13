@@ -3,7 +3,7 @@
 \title{Counting reads across intervals}
 \description{Counts the number of reads starting at each position across given
 genomic intervals}
-\usage{count.reads(reads_fn, I, sb=NULL, binary=FALSE, sum.counts=TRUE)}
+\usage{count.reads(reads_fn, I, sb=NULL, binary=FALSE, sum.counts=FALSE)}
 \arguments{
   \item{reads_fn}{filename of aligned reads in BAM format}
   \item{I}{a GRanges object giving valid genomic intervals}

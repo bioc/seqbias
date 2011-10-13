@@ -1,5 +1,5 @@
 Package: seqbias
-Version: 1.1.3
+Version: 1.1.4
 Date: 25-12-2010
 Title: Estimation of per-position bias in high-throughput sequencing data
 Description: This package implements a model of per-position sequencing bias in
@@ -11,6 +11,7 @@ Maintainer: Daniel Jones <dcjones@cs.washington.edu>
 Depends: R (>= 2.13.0), GenomicRanges (>= 0.1.0),
          Biostrings (>= 2.15.0), methods 
 LinkingTo: Rsamtools
+Imports: zlibbioc
 biocViews: Sequencing, HighThroughputSequencing
 LazyLoad: yes
 License: LGPL-3
