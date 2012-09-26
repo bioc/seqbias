@@ -1,0 +1,18 @@
+citHeader("To cite package 'seqbias' in publications use:")
+citEntry(entry = "article",
+         title = "A new approach to bias correction in RNA-Seq",
+         author = personList(as.person("Daniel C. Jones"),
+                             as.person("Walter L. Ruzzo"),
+                             as.person("Xinxia Peng"),
+                             as.person("Micheal G. Katze")),
+         year = 2012,
+         journal = "Bioinformatics",
+         volume = "28",
+         issue = "7",
+         pages = "921-928",
+         doi = "10.1093/bioinformatics/bts055",
+         textVersion = paste("A new approach to bias correction in RNA-Seq ",
+                             "Daniel C. Jones; Walter L. Ruzzo; Xinxia Peng; ",
+                             "Michael G. Katze.  Bioinformatics 2012; ",
+                             "doi: 10.1093/bioinformatics/bts055", sep = ""))
+
