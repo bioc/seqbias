@@ -1,5 +1,5 @@
 Package: seqbias
-Version: 1.11.2
+Version: 1.11.3
 Date: 25-12-2010
 Title: Estimation of per-position bias in high-throughput sequencing
         data
@@ -16,4 +16,4 @@ Imports: zlibbioc
 Suggests: Rsamtools, ggplot2
 LazyLoad: yes
 License: LGPL-3
-biocViews: Sequencing, Sequencing
+biocViews: Sequencing
