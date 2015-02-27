@@ -1,5 +1,13 @@
 include Makevars.common
 
+SAMVARS=$(shell echo 'cat(system.file("usretc", .Platform[["r_arch"]],\
+    "Rsamtools.mk", package="Rsamtools", mustWork=TRUE))' |\
+    "${R_HOME}/bin/R" --vanilla --slave)
+include $(SAMVARS)
+
+PKG_LIBS=$(SAMTOOLS_LIBS)
+PKG_CPPFLAGS=$(SAMTOOLS_CPPFLAGS)
+
 OBJECTS = $(SEQBIAS_OBJ) \
 		  $(YAML_CPP_OBJ:%=yaml-cpp/%)
 
