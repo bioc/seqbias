@@ -741,8 +741,10 @@ class motif_trainer
     double* ps1_i;
     double* ps1_j;
 
-    static const double pseudocount = 1.0;
+    /* Initialize outside class definition */
+    static const double pseudocount;
 };
+const double motif_trainer::pseudocount = 1.0;
 
 
 
