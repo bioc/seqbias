@@ -2,6 +2,12 @@
 #include "sequencing_bias.hpp"
 #include <algorithm>
 
+#include <R.h>
+#include <Rinternals.h>
+#include <Rdefines.h>
+#include <R_ext/Rdynload.h>
+#include <cstdio>
+
 extern "C" {
 
 #include "samtools/faidx.h"
@@ -12,11 +18,6 @@ extern "C" {
 #undef ERROR
 #endif
 
-#include <R.h>
-#include <Rinternals.h>
-#include <Rdefines.h>
-#include <R_ext/Rdynload.h>
-#include <stdio.h>
 
 // more R namespace pollution
 #if defined(nrows)
