@@ -12,7 +12,7 @@
 #include "common.h"
 #include "motif.hpp"
 #include "pos_table.h"
-#include "samtools/faidx.h"
+#include "htslib/faidx.h"
 #include "yaml-cpp/yaml.h"
 #include <string>
 

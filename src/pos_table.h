@@ -24,7 +24,7 @@ extern "C" {
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include "samtools/sam.h"
+#include "sam.h"
 
 
 /* The table maps positions to counts. */

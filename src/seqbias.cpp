@@ -10,8 +10,8 @@
 
 extern "C" {
 
-#include "samtools/faidx.h"
-#include "samtools/sam.h"
+#include "htslib/faidx.h"
+#include "sam.h"
 
 
 #ifdef ERROR

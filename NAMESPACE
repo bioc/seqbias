@@ -1,3 +1,2 @@
 exportPattern("^[^\\.]")
 useDynLib(seqbias)
-import(zlibbioc)

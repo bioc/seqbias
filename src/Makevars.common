@@ -7,10 +7,12 @@ YAML_CPP_OBJ = aliasmanager.o conversion.o directives.o \
 
 
 
-SEQBIAS_OBJ = common.o \
+SEQBIAS_OBJ = sam.o \
+              bam_plbuf.o \
+              bam_aux.o \
+              common.o \
               miscmath.o \
               pos_table.o \
-              samtools_extra.o \
               kmer_matrix.o \
               logger.o \
               motif.o \

@@ -9,8 +9,7 @@
 #include "logger.hpp"
 #include "twobitseq.hpp"
 #include "miscmath.h"
-#include "samtools_extra.h"
-#include "samtools/faidx.h"
+#include "htslib/faidx.h"
 #include <climits>
 #include <cmath>
 #include <cctype>
@@ -219,7 +218,7 @@ void sequencing_bias::build(const char* ref_fn,
         logger::abort("Can't open bam index '%s.bai'.", reads_fn);
     }
 
-    bam_init_header_hash(reads_f->header);
+    //bam_init_header_hash(reads_f->header);
 
     bam1_t* read = bam_init1();
 
@@ -485,7 +484,7 @@ kmer_matrix tabulate_bias(double* kl,
     }
 
 
-    bam_init_header_hash(reads_f->header);
+    //bam_init_header_hash(reads_f->header);
     bam1_t* read = bam_init1();
 
     pos_table T;
