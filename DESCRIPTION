@@ -1,5 +1,5 @@
 Package: seqbias
-Version: 1.32.0
+Version: 1.33.0
 Date: 2019-03-15
 Title: Estimation of per-position bias in high-throughput sequencing
         data
