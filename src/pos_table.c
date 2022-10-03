@@ -1,6 +1,7 @@
 
 #include "pos_table.h"
 #include "logger.h"
+#include <samtools-1.7-compat.h>
 
 
 

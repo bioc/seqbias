@@ -5,12 +5,7 @@ YAML_CPP_OBJ = aliasmanager.o conversion.o directives.o \
                regex.o scanner.o scanscalar.o scantag.o scantoken.o \
                simplekey.o singledocparser.o stream.o tag.o
 
-
-
-SEQBIAS_OBJ = sam.o \
-              bam_plbuf.o \
-              bam_aux.o \
-              common.o \
+SEQBIAS_OBJ = common.o \
               miscmath.o \
               pos_table.o \
               kmer_matrix.o \

@@ -7,11 +7,11 @@ Description: This package implements a model of per-position sequencing
         bias in high-throughput sequencing data using a simple Bayesian
         network, the structure and parameters of which are trained on a
         set of aligned reads and a reference genome sequence.
-Author: Daniel Jones <dcjones@cs.washington.edu>
-Maintainer: Daniel Jones <dcjones@cs.washington.edu>
+Author: Daniel Jones <djones3@fredhutch.org>
+Maintainer: Daniel Jones <djones3@fredhutch.org>
 Depends: R (>= 3.0.2), GenomicRanges (>= 0.1.0), Biostrings (>=
         2.15.0), methods
-LinkingTo: Rhtslib (>= 1.15.3)
+LinkingTo: Rhtslib (>= 1.99.1), zlibbioc
 SystemRequirements: GNU make
 Suggests: Rsamtools, ggplot2
 LazyLoad: yes

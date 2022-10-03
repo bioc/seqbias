@@ -12,6 +12,9 @@ RHTSLIB_CPPFLAGS=$(shell "${R_HOME}/bin${R_ARCH_BIN}/Rscript" -e \
 PKG_LIBS=$(RHTSLIB_LIBS)
 PKG_CPPFLAGS=$(RHTSLIB_CPPFLAGS)
 
+$(info $$SEQBIAS_OBJ is [${SEQBIAS_OBJ}])
+$(info $$YAML_CPP_OBJ is [${YAML_CPP_OBJ}])
+
 OBJECTS = $(SEQBIAS_OBJ) $(YAML_CPP_OBJ:%=yaml-cpp/%)
 
 all : $(SHLIB)

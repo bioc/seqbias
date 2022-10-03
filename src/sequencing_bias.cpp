@@ -16,6 +16,7 @@
 #include <ctime>
 #include <fstream>
 #include <algorithm>
+#include <samtools-1.7-compat.h>
 
 using namespace std;
 
